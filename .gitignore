@@ -1,0 +1,10 @@
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store
+~$*
+Assignment6_Submission.zip
+Assignment 6.pdf
+report/
+DEFENSE_GUIDE.md
+scripts/generate_report.py

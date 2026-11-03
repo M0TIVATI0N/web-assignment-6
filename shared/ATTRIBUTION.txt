@@ -1,0 +1,11 @@
+jQuery 3.7.1
+Copyright OpenJS Foundation and other contributors. MIT license.
+Source: https://code.jquery.com/jquery-3.7.1.min.js
+License: https://jquery.org/license/
+
+Guest avatars: Open Peeps by Pablo Stanley, distributed through DiceBear API v9.
+Open Peeps artwork is CC0 1.0 (public domain dedication).
+https://www.openpeeps.com/
+https://www.dicebear.com/styles/open-peeps/
+https://creativecommons.org/publicdomain/zero/1.0/
+Avatar seeds are guest names from the assignment. All assets are stored locally.
