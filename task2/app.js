@@ -32,7 +32,7 @@
         .css('--clothing-color', colors[guest.color]);
       if (guest.aitu) $card.addClass('aitu');
       guest.items.forEach(function (item) { $card.addClass('has-' + item); });
-      const $avatar = $('<span>', { class: 'avatar-wrap' }).append($('<img>', { src: '../shared/avatars/' + guest.id + '.svg', alt: '', width: 48, height: 48 }));
+      const $avatar = $('<span>', { class: 'avatar-wrap' }).append($('<img>', { src: '../shared/avatars/' + guest.id + '.svg', alt: '' }));
       if (guest.aitu) $avatar.append($('<span>', { class: 'aitu-badge', title: 'AITU student', text: 'A' }));
       const $items = $('<span>', { class: 'guest-items', 'aria-label': guest.items.length ? 'Has ' + guest.items.map(function (item) { return itemWords[item]; }).join(', ') : 'No belongings' });
       guest.items.forEach(function (item) {

@@ -30,6 +30,7 @@ body[data-task="1"] .sort-btn { display: none; }
 .avatar-wrap {
   position: relative;
   display: block;
+  flex: none;
   width: 44px;
   height: 44px;
   margin-bottom: 5px;
