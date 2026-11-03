@@ -1,6 +1,7 @@
 * { box-sizing: border-box; }
 body { margin: 20px; color: #222; background: white; font: 14px Arial, sans-serif; }
 button { cursor: pointer; font: inherit; }
+nav a[aria-current="page"] { font-weight: bold; }
 .workspace { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; }
 .workspace > * { min-width: 0; }
 .floor { margin-bottom: 20px; }
