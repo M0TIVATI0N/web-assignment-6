@@ -5,13 +5,7 @@
   $(function () {
     const isTask2 = $('body').attr('data-task') === '2';
     const colors = { red: '#db6469', blue: '#4b7fc7', green: '#438f72', black: '#323943', yellow: '#d6a42d', purple: '#9365b6' };
-    const iconPaths = {
-      phone: '<rect x="4" y="1.5" width="8" height="13" rx="1.5"/><path d="M7 12h2"/>',
-      glasses: '<circle cx="4" cy="9" r="3"/><circle cx="12" cy="9" r="3"/><path d="M7 8.5h2M1 8l1-4M15 8l-1-4"/>',
-      bag: '<path d="M3 5h10l-1 9H4L3 5zM5.5 6V4a2.5 2.5 0 0 1 5 0v2"/>',
-      cup: '<path d="M2 5h9v5a4.5 4.5 0 0 1-9 0V5zM11 6h1a2.5 2.5 0 0 1 0 5h-1M4 1v2M8 1v2"/>',
-      crumbs: '<path d="M2 7l7-5 4 5H2v6h11V7M2 10h9M14 13h1M13 15h1"/>'
-    };
+    const icons = { phone: '📱', glasses: '👓', bag: '👜', cup: '☕', crumbs: '🍰' };
     const itemWords = { phone: 'a phone', glasses: 'glasses', bag: 'a bag', cup: 'a cup', crumbs: 'cake crumbs' };
     let party;
     let pictureOrders;
@@ -20,7 +14,6 @@
     let finishMutation = null;
     let detail = null;
     let detailVersion = 0;
-    let currentCase = null;
 
     function copy(value) { return $.extend(true, Array.isArray(value) ? [] : {}, value); }
     function minutes(time) { const parts = time.split(':'); return Number(parts[0]) * 60 + Number(parts[1]); }
@@ -43,7 +36,7 @@
       if (guest.aitu) $avatar.append($('<span>', { class: 'aitu-badge', title: 'AITU student', text: 'A' }));
       const $items = $('<span>', { class: 'guest-items', 'aria-label': guest.items.length ? 'Has ' + guest.items.map(function (item) { return itemWords[item]; }).join(', ') : 'No belongings' });
       guest.items.forEach(function (item) {
-        $items.append($('<span>', { class: 'item', title: itemWords[item] }).html('<svg viewBox="0 0 16 16" aria-hidden="true">' + iconPaths[item] + '</svg>'));
+        $items.append($('<span>', { class: 'item', title: itemWords[item], text: icons[item] }));
       });
       if (!guest.items.length) $items.append($('<span>', { class: 'nothing', text: '—', title: 'No belongings' }));
       return $card.append($avatar, $('<span>', { class: 'guest-name', text: guest.name }), $('<span>', { class: 'guest-time', text: guest.time }), $items);
@@ -51,7 +44,6 @@
 
     function updateCounts() {
       $('.room').each(function () { $(this).find('.room-count').text($(this).find('.guest-list > .guest').length); });
-      $('.scene-metrics span').first().find('strong').text($('.guest-list > .guest').length);
     }
 
     function renderParty() {
@@ -59,7 +51,7 @@
       [2, 1].forEach(function (floor) {
         const $floor = $('<section>', { class: 'floor', 'data-floor': floor, 'aria-label': 'Floor ' + floor });
         const $rooms = $('<div>', { class: 'rooms' });
-        $floor.append($('<h3>', { class: 'floor-heading', text: floor === 2 ? '02 / Upstairs' : '01 / Downstairs' }), $rooms);
+        $floor.append($('<h3>', { class: 'floor-heading', text: floor === 2 ? 'Floor 2 (upstairs)' : 'Floor 1 (downstairs)' }), $rooms);
         party.filter(function (room) { return room.floor === floor; }).forEach(function (room) {
           const $room = $('<section>', { class: 'room', id: room.id, 'data-room': room.id, 'data-name': room.name, 'aria-label': room.name });
           const $heading = $('<div>', { class: 'room-heading' }).append($('<h3>', { text: room.name }), $('<span>', { class: 'room-count', text: room.guests.length }));
@@ -140,7 +132,7 @@
       const $panel = $('<section>', { class: 'guest-detail', role: 'dialog', 'aria-modal': 'true', 'aria-label': guest.name + ' details', tabindex: '-1' }).css($.extend({ opacity: 0.35 }, avatarRectangle(id))).appendTo('#detail-layer');
       const $content = $('<div>', { class: 'detail-content' });
       const $close = $('<button>', { class: 'detail-close', type: 'button', 'aria-label': 'Close guest details', text: '×' });
-      $content.append($close, createGuest(guest).find('.avatar-wrap').clone(), $('<p>', { class: 'eyebrow', text: 'PARTY GUEST / ' + found.room.name.toUpperCase() }), $('<h2>', { text: guest.name }));
+      $content.append($close, createGuest(guest).find('.avatar-wrap').clone(), $('<h2>', { text: guest.name }), $('<p>', { text: 'Room: ' + found.room.name }));
       $content.append($('<p>', { text: 'Came at ' + guest.time }), $('<p>', { text: guest.aitu ? 'AITU student' : 'Not an AITU student' }), $('<p>', { text: 'Wearing ' + guest.color }));
       const words = guest.items.map(function (item) { return itemWords[item]; });
       const possessions = words.length > 1 ? words.slice(0, -1).join(', ') + ' and ' + words[words.length - 1] : words[0];
@@ -181,12 +173,11 @@
 
     function clear() {
       settleScene();
-      currentCase = null;
       removeHighlight();
       if (isTask2) $('.guest').stop(true, false).fadeTo(300, 1);
-      $('#result-title').text('A fresh look at the party');
+      $('#result-title').text('Results cleared');
       $('#result-count').text($('.guest').length + ' guests in the house');
-      $('#result-names').text('Everyone is bright again. Choose another lead to continue.');
+      $('#result-names').text('Select a case to see the matching guests or rooms.');
       $('#case-chain').text('// Select a case to inspect its chain.');
       announce('Cleared. All guests are bright.');
     }
@@ -202,7 +193,6 @@
       // Rebuild before every case. Task 2 rebuilds from its current, moved model.
       renderParty();
       removeHighlight();
-      currentCase = investigation.id;
       if (id === 18 || id === 19) {
         finishMutation = function () {
           if (id === 19) $('#natasha').stop(true, false).remove();
@@ -227,7 +217,7 @@
         if (id !== 18 && id !== 19) $guests.stop(true, false).fadeTo(300, 1);
       }
       if (id !== 18 && id !== 19) $guests.stop(true, true).animate({ top: -9 }, 140).animate({ top: 0 }, 160);
-      // The jump is queued after the arrival/departure effect, not in place of it.
+      // Miras jumps after fading in.
       if (id === 18) $guests.animate({ top: -9 }, 140).animate({ top: 0 }, 160);
       $('.case-btn[data-case="' + id + '"]').addClass('is-active').attr('aria-pressed', 'true');
       $('#result-title').text('Case ' + String(id).padStart(2, '0') + ' · ' + investigation.title);
@@ -331,9 +321,9 @@
       sorted = {};
       renderParty();
       clear();
-      $('#result-title').text('The investigation starts here');
-      $('#result-count').text('20 leads to explore');
-      $('#result-names').text('Choose a lead above to reveal the guests or rooms that match.');
+      $('#result-title').text('Case results');
+      $('#result-count').text('Select one of the 20 cases.');
+      $('#result-names').text('Matching guests or rooms will appear here.');
       announce('Original party restored.');
     }
 
@@ -345,7 +335,7 @@
     $('#clear-btn').on('click', clear);
     $('#reset-btn').on('click', reset);
     if (isTask2) {
-      $('#scene-hint').text('Click a guest for their story. Move guests, sort rooms, and follow the clues.');
+      $('#scene-hint').text('Click a guest to see details or move them. Use Sort by time to change the order.');
       $('#house').on('click', '.guest', function () { openDetail(this.id); });
       $('#house').on('click', '.sort-btn', function () { sortRoom($(this).attr('data-room')); });
       $('#detail-layer').on('click', '.detail-backdrop, .detail-close', function () { closeDetail(false); });

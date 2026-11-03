@@ -1,6 +1,8 @@
-# Assignment 6 — The Missing Slice
+# Assignment 6 — jQuery
 
 A jQuery investigation of the birthday party in the supplied assignment. Task 1 solves all 20 selector cases; Task 2 is a separate copy with spotlight effects, expandable guest details, animated room moves, and time sorting.
+
+The design uses basic CSS: Arial text, simple borders, ordinary buttons, and colored avatar rings. JavaScript handles the jQuery interactions required by the assignment.
 
 ## Run
 
