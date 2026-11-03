@@ -8,10 +8,17 @@
 </head>
 <body data-task="2">
   <h1>Task 2: Party in Motion</h1>
-  <nav><a href="../task1/index.html">Task 1: Selector Detective</a> | <a href="../task2/index.html" aria-current="page">Task 2: Party in Motion</a></nav>
+  <nav>
+    <a href="../task1/index.html">Task 1: Selector Detective</a>
+    |
+    <a href="../task2/index.html" aria-current="page">Task 2: Party in Motion</a>
+  </nav>
   <p>Click guests for details and room moves, sort rooms by time, or select a case to spotlight its matches.</p>
   <p>The birthday cake disappeared from the kitchen at 21:30. Use the cases to find out who took it.</p>
-  <p><button id="reset-btn" type="button">Reset party</button> <button id="clear-btn" type="button">Clear</button></p>
+  <p>
+    <button id="reset-btn" type="button">Reset party</button>
+    <button id="clear-btn" type="button">Clear</button>
+  </p>
   <main class="workspace">
     <section>
       <h2>The party</h2>
@@ -26,7 +33,10 @@
         <h3 id="result-title">Choose a case</h3>
         <p id="result-count">20 cases</p>
         <p id="result-names">The matching names will appear here.</p>
-        <details id="chain-details"><summary>Show jQuery chain</summary><pre><code id="case-chain">// Choose a case.</code></pre></details>
+        <details id="chain-details">
+          <summary>Show jQuery chain</summary>
+          <pre><code id="case-chain">// Choose a case.</code></pre>
+        </details>
       </section>
     </aside>
   </main>
