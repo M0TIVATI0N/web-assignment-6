@@ -13,7 +13,7 @@ const root = path.resolve(__dirname, '..');
 const reportDir = path.join(root, 'report');
 const screenshotDir = path.join(reportDir, 'screenshots');
 fs.mkdirSync(screenshotDir, { recursive: true });
-const evidence = { generatedAt: new Date().toISOString(), checks: [], cases: [], consoleErrors: [] };
+const evidence = { generatedAt: new Date().toISOString(), checks: [], cases: [], task2Cases: [], consoleErrors: [], failedRequests: [], externalRequests: [] };
 const expectedCases = {
   1: ['Arman', 'Sophia', 'Dias', 'Bekzat', 'Aruzhan', 'Saule'],
   2: ['Arman', 'Sophia', 'Bekzat', 'Sergey', 'Natasha', 'Inkar'],
@@ -77,14 +77,61 @@ async function reset(page) {
   await settle(page);
 }
 
+async function guestLayout(page, label) {
+  const result = await page.locator('.guest-list > .guest').evaluateAll(nodes => {
+    const outside = [], overlap = [], unloaded = [];
+    nodes.forEach(node => {
+      const ring = node.querySelector('.avatar-wrap').getBoundingClientRect();
+      const img = node.querySelector('.avatar-wrap img');
+      const photo = img.getBoundingClientRect();
+      const name = node.querySelector('.guest-name').getBoundingClientRect();
+      if (!img.complete || img.naturalWidth === 0) unloaded.push(node.id);
+      if (photo.left < ring.left - 0.5 || photo.right > ring.right + 0.5 || photo.top < ring.top - 0.5 || photo.bottom > ring.bottom + 0.5) outside.push(node.id);
+      if (name.top < ring.bottom - 0.5) overlap.push(node.id);
+    });
+    return { outside, overlap, unloaded };
+  });
+  record(label + ': all local avatar files load', [], result.unloaded);
+  record(label + ': every avatar stays inside its clothing-color ring', [], result.outside);
+  record(label + ': names stay below avatars without overlap', [], result.overlap);
+}
+
+async function navigationState(page) {
+  return page.evaluate(() => ({ task: document.body.dataset.task, heading: document.querySelector('h1').textContent, current: document.querySelector('nav a[aria-current="page"]').textContent, isTask2: window.PartyApp.isTask2 }));
+}
+
+async function runtimeScripts(page, label) {
+  record(label + ': only jQuery and the three local application scripts run', ['jquery-3.7.1.min.js', 'data.js', 'cases.js', 'app.js'], await page.locator('script[src]').evaluateAll(nodes => nodes.map(node => node.src.split('/').at(-1))));
+}
+
 (async function main() {
   const browser = await chromium.launch({ executablePath: process.env.CHROME_EXECUTABLE || undefined, headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
   const page = await browser.newPage({ viewport: { width: 1600, height: 1050 }, deviceScaleFactor: 1 });
+  await page.context().setOffline(true);
   page.on('pageerror', error => evidence.consoleErrors.push(error.message));
+  page.on('requestfailed', request => evidence.failedRequests.push({ url: request.url(), error: request.failure()?.errorText }));
+  page.on('request', request => { if (/^https?:/.test(request.url())) evidence.externalRequests.push(request.url()); });
 
   try {
     await page.goto(pathToFileURL(path.join(root, 'task1/index.html')).href);
     await page.waitForFunction(() => window.PartyApp && jQuery('.guest-list > .guest').length === 21);
+    record('Task 1 heading, current navigation link, and behavior flag agree', { task: '1', heading: 'Task 1: Selector Detective', current: 'Task 1: Selector Detective', isTask2: false }, await navigationState(page));
+    await guestLayout(page, 'Task 1 desktop');
+    await runtimeScripts(page, 'Task 1');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await guestLayout(page, 'Task 1 mobile');
+    await page.setViewportSize({ width: 1600, height: 1050 });
+    await page.locator('nav a[href="../task2/index.html"]').click();
+    await page.waitForFunction(() => window.PartyApp && window.PartyApp.isTask2 === true);
+    record('Task 1 to Task 2 navigation loads the correct heading and behavior', { task: '2', heading: 'Task 2: Party in Motion', current: 'Task 2: Party in Motion', isTask2: true }, await navigationState(page));
+    await guestLayout(page, 'Task 2 desktop');
+    await runtimeScripts(page, 'Task 2');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await guestLayout(page, 'Task 2 mobile');
+    await page.setViewportSize({ width: 1600, height: 1050 });
+    await page.locator('nav a[href="../task1/index.html"]').click();
+    await page.waitForFunction(() => window.PartyApp && window.PartyApp.isTask2 === false);
+    record('Task 2 to Task 1 navigation restores the correct heading and behavior', { task: '1', heading: 'Task 1: Selector Detective', current: 'Task 1: Selector Detective', isTask2: false }, await navigationState(page));
     record('Task 1 builds all 21 original guests in picture order', allOriginalIds, await page.locator('.guest-list > .guest').evaluateAll(nodes => nodes.map(node => node.id)));
     record('Task 1 has twenty case buttons', 20, await page.locator('.case-btn').count());
 
@@ -120,6 +167,20 @@ async function reset(page) {
 
     await page.goto(pathToFileURL(path.join(root, 'task2/index.html')).href);
     await page.waitForFunction(() => window.PartyApp && window.PartyApp.isTask2 === true && jQuery('.guest-list > .guest').length === 21);
+    for (let id = 1; id <= 20; id += 1) {
+      await reset(page);
+      await page.locator(`.case-btn[data-case="${id}"]`).click();
+      await settle(page);
+      const result = await page.evaluate(caseId => {
+        const item = window.PartyCases.find(c => c.id === caseId);
+        const names = item.target === 'rooms' ? jQuery('.room.is-found').map(function () { return jQuery(this).attr('data-name'); }).get() : jQuery('.guest-list > .guest.is-found').map(function () { return jQuery(this).attr('data-name'); }).get();
+        return { names: caseId === 19 && jQuery('#result-names').text().includes('Natasha') ? ['Natasha'] : names, count: jQuery('.guest-list > .guest').length };
+      }, id);
+      const passed = record(`Task 2 fresh case ${id}: matches the assignment answer`, expectedCases[id], result.names);
+      record(`Task 2 fresh case ${id}: has the correct guest count`, id === 18 ? 22 : id === 19 ? 20 : 21, result.count);
+      evidence.task2Cases.push({ id, expected: expectedCases[id], observed: result.names, passed });
+    }
+    await reset(page);
     await page.locator('.case-btn[data-case="3"]').click();
     await settle(page);
     record('Task 2 spotlight: upstairs AITU students stay bright and all others fade to 20%', Object.fromEntries(allOriginalIds.map(id => [id, ['aigerim', 'ivan', 'sophia', 'dias', 'aruzhan'].includes(id) ? 1 : 0.2])), await brightness(page));
@@ -168,6 +229,20 @@ async function reset(page) {
     record('Fast guest switches leave only the most recently requested detail open', { count: 1, latest: true }, { count: await page.locator('.guest-detail').count(), latest: /Dias/.test(await page.locator('.guest-detail').innerText()) });
     await page.keyboard.press('Escape');
     await settle(page);
+
+    await page.locator('#arman').click();
+    await settle(page);
+    await page.evaluate(() => { jQuery('#sophia').trigger('click'); jQuery(document.body).trigger('click'); });
+    await settle(page);
+    await page.waitForTimeout(500);
+    record('An outside click during a guest switch cancels the pending new detail', 0, await page.locator('.guest-detail').count());
+
+    await page.evaluate(() => { window.PartyApp.runCase(18); jQuery('#miras').trigger('click'); });
+    await settle(page);
+    record('Clicking Miras immediately during arrival opens his synchronized guest detail', { count: 1, miras: true }, { count: await page.locator('.guest-detail').count(), miras: /Miras/.test(await page.locator('.guest-detail').innerText()) });
+    await page.keyboard.press('Escape');
+    await settle(page);
+    await reset(page);
 
     await page.locator('#arman').click();
     await settle(page);
@@ -220,10 +295,48 @@ async function reset(page) {
     await page.locator('#living-room .sort-btn').click();
     await settle(page);
     record('Living room second sort restores picture order', pictureLiving, await idsIn(page, 'living-room'));
+    const interruptedSort = await page.evaluate(async () => {
+      jQuery('#living-room .sort-btn').trigger('click');
+      await new Promise(resolve => setTimeout(resolve, 150));
+      const positions = () => Object.fromEntries(jQuery('.sort-flight').toArray().map(node => {
+        const rect = node.getBoundingClientRect();
+        return [node.dataset.name, { left: rect.left, top: rect.top }];
+      }));
+      const before = positions();
+      jQuery('#living-room .sort-btn').trigger('click');
+      const after = positions();
+      return { before, after, jumps: Object.fromEntries(Object.keys(before).map(name => [name, after[name] ? Math.hypot(before[name].left - after[name].left, before[name].top - after[name].top) : null])) };
+    });
+    evidence.interruptedSortGeometry = interruptedSort;
+    record('Reversing a sort after 150ms continues from every card’s current position without a jump', { cards: 5, allContinuous: true }, { cards: Object.keys(interruptedSort.jumps).length, allContinuous: Object.values(interruptedSort.jumps).every(distance => distance !== null && distance < 3) });
+    await settle(page);
+    record('An interrupted sort reversal still finishes in picture order', pictureLiving, await idsIn(page, 'living-room'));
     await page.evaluate(() => { for (let i = 0; i < 5; i++) jQuery('#living-room .sort-btn').trigger('click'); });
     await settle(page);
     record('Five very fast sort clicks end in sorted order', sortedLiving, await idsIn(page, 'living-room'));
     record('Fast sort clicks leave no animation queues', { animated: 0, queued: 0, transientCards: 0 }, await noQueues(page));
+
+    await page.locator('#living-room .sort-btn').click();
+    await settle(page);
+    const spacedSort = await page.evaluate(async () => {
+      const samples = [];
+      const positions = () => Object.fromEntries(jQuery('.sort-flight').toArray().map(node => {
+        const rect = node.getBoundingClientRect();
+        return [node.dataset.name, { left: rect.left, top: rect.top }];
+      }));
+      for (let click = 0; click < 5; click++) {
+        const before = positions();
+        jQuery('#living-room .sort-btn').trigger('click');
+        const after = positions();
+        if (click > 0) samples.push(Object.keys(before).map(name => after[name] ? Math.hypot(before[name].left - after[name].left, before[name].top - after[name].top) : null));
+        await new Promise(resolve => setTimeout(resolve, 40));
+      }
+      return samples;
+    });
+    evidence.spacedSortGeometry = spacedSort;
+    record('Five sort clicks 40ms apart preserve all visible card positions at each reversal', { interruptions: 4, allContinuous: true }, { interruptions: spacedSort.length, allContinuous: spacedSort.every(sample => sample.length === 5 && sample.every(distance => distance !== null && distance < 3)) });
+    await settle(page);
+    record('Five sort clicks 40ms apart finish in sorted order', sortedLiving, await idsIn(page, 'living-room'));
 
     await page.locator('.case-btn[data-case="19"]').click();
     await settle(page);
@@ -280,6 +393,8 @@ async function reset(page) {
     await page.keyboard.press('Escape');
     await settle(page);
     record('Browser has no uncaught JavaScript errors', [], evidence.consoleErrors);
+    record('All pages, avatars, and scripts load with no failed asset requests while offline', [], evidence.failedRequests);
+    record('The application makes no network requests and works completely offline', [], evidence.externalRequests);
   } catch (error) {
     record('Browser test run completes', 'No exception', error.stack || error.message);
     await snapshot(page, 'test-failure.png').catch(() => {});

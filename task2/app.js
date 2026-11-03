@@ -119,6 +119,11 @@
     function openDetail(id) {
       if (!isTask2) return;
       if (finishLayout) finishLayout();
+      if (finishMutation) {
+        const finish = finishMutation;
+        finishMutation = null;
+        finish();
+      }
       const found = guestById(id);
       if (!found) return;
       if (detail && detail.id === id) return;
@@ -151,6 +156,16 @@
       $panel.animate({ left: ($(window).width() - width) / 2, top: Math.max(15, ($(window).height() - height) / 2), width: width, height: height, opacity: 1 }, 280, function () {
         if (detail && version === detailVersion) { $panel.css('overflow-y', 'auto'); $content.fadeTo(120, 1); $close.trigger('focus'); }
       });
+    }
+
+    function dismissDetail() {
+      if (detail) closeDetail(false);
+      else {
+        // Cancel a pending guest switch while its previous card is closing.
+        $('#detail-layer').find('*').stop(true, false);
+        $('#detail-layer').empty();
+        detailVersion++;
+      }
     }
 
     function settleScene() {
@@ -283,13 +298,23 @@
     }
 
     function sortRoom(id) {
+      const visiblePositions = {};
+      $('.sort-flight').each(function () {
+        visiblePositions[$(this).attr('data-name')] = { offset: $(this).offset(), width: $(this).outerWidth(), height: $(this).outerHeight() };
+      });
       settleScene();
       const room = roomById(id);
       if (!room) return;
       sorted[id] = !sorted[id];
       const $list = $('#' + id + ' .guest-list');
       const snapshots = {};
-      $list.children('.guest').each(function () { snapshots[this.id] = { offset: $(this).offset(), $flight: makeFlight($(this), $(this).offset()).addClass('sort-flight') }; });
+      $list.children('.guest').each(function () {
+        const $guest = $(this);
+        const visible = visiblePositions[$guest.attr('data-name')];
+        const $flight = makeFlight($guest, visible ? visible.offset : $guest.offset()).addClass('sort-flight');
+        if (visible) $flight.css({ width: visible.width, height: visible.height });
+        snapshots[this.id] = { $flight: $flight };
+      });
       room.guests.sort(function (a, b) {
         return (sorted[id] ? minutes(a.time) - minutes(b.time) : 0) || pictureOrders[id].indexOf(a.id) - pictureOrders[id].indexOf(b.id);
       });
@@ -338,17 +363,13 @@
       $('#scene-hint').text('Click a guest to see details or move them. Use Sort by time to change the order.');
       $('#house').on('click', '.guest', function () { openDetail(this.id); });
       $('#house').on('click', '.sort-btn', function () { sortRoom($(this).attr('data-room')); });
-      $('#detail-layer').on('click', '.detail-backdrop, .detail-close', function () { closeDetail(false); });
+      $('#detail-layer').on('click', '.detail-backdrop, .detail-close', dismissDetail);
       $('#detail-layer').on('click', '.move-btn', function () { moveGuest($(this).attr('data-guest'), $(this).attr('data-move-to')); });
       $(document).on('click', function (event) {
-        if (detail && !$(event.target).closest('.guest-detail, #house .guest').length) closeDetail(false);
+        if ($('#detail-layer').children().length && !$(event.target).closest('.guest-detail, #house .guest').length) dismissDetail();
       });
       $(document).on('keydown', function (event) {
-        if (event.key === 'Escape') {
-          // Closing panels also need cancellation when Escape interrupts a swap.
-          if (!detail) { $('#detail-layer').find('*').stop(true, false); $('#detail-layer').empty(); detailVersion++; }
-          closeDetail(false);
-        }
+        if (event.key === 'Escape') dismissDetail();
         if (event.key === 'Tab' && detail) {
           const $buttons = detail.$panel.find('button');
           if (event.shiftKey && document.activeElement === $buttons.first()[0]) { event.preventDefault(); $buttons.last().trigger('focus'); }
